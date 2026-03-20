@@ -1,0 +1,5 @@
+agent-framework==1.0.0rc3
+agent-framework-azure-ai==1.0.0rc3
+streamlit>=1.35.0
+python-dotenv>=1.0.0
+brotlicffi>=1.1.0
