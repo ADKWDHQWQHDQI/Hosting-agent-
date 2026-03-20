@@ -36,9 +36,12 @@ _SECRET_KEYS = [
     "AZURE_CLIENT_ID",
     "AZURE_CLIENT_SECRET",
 ]
-for _k in _SECRET_KEYS:
-    if _k in st.secrets and _k not in os.environ:
-        os.environ[_k] = st.secrets[_k]
+try:
+    for _k in _SECRET_KEYS:
+        if _k in st.secrets and _k not in os.environ:
+            os.environ[_k] = st.secrets[_k]
+except Exception:
+    pass  # No secrets.toml locally — credentials come from .env or az login
 
 # ── aiohttp / azure-core transport patch (same root fix as run_agent.py) ────────
 # azure-core creates its aiohttp ClientSession with auto_decompress=False,
