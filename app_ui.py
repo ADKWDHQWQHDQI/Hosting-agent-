@@ -32,6 +32,7 @@ load_dotenv()
 # picks them up automatically — no code change needed between local and cloud.
 _SECRET_KEYS = [
     "AZURE_AI_PROJECT_ENDPOINT",
+    "AZURE_AI_API_KEY",
     "AZURE_TENANT_ID",
     "AZURE_CLIENT_ID",
     "AZURE_CLIENT_SECRET",
@@ -70,6 +71,7 @@ _AioHttpTransport.open = _patched_open
 from agent_framework import Agent  # noqa: E402
 from agent_framework.azure import AzureAIClient  # noqa: E402
 from azure.ai.projects.aio import AIProjectClient  # noqa: E402
+from azure.core.credentials import AzureKeyCredential  # noqa: E402
 from azure.identity.aio import DefaultAzureCredential  # noqa: E402
 
 # ── Constants ───────────────────────────────────────────────────────────────────
@@ -167,6 +169,34 @@ async def _run_async(user_input: str, placeholder) -> str:
             "AZURE_AI_PROJECT_ENDPOINT is not set. "
             "Add it to your .env file and restart the app."
         )
+
+    api_key = os.environ.get("AZURE_AI_API_KEY")
+    if api_key:
+        # Key-based auth — no service principal needed (used on Streamlit Cloud)
+        credential = AzureKeyCredential(api_key)
+        project_client = AIProjectClient(endpoint=endpoint, credential=credential)
+        async with (
+            Agent(
+                client=AzureAIClient(
+                    project_client=project_client,
+                    agent_name=AGENT_NAME,
+                    model_deployment_name=MODEL_DEPLOYMENT,
+                    use_latest_version=True,
+                ),
+            ) as agent,
+        ):
+            tool_calls_seen: set = set()
+            async for chunk in agent.run([user_input], stream=True):
+                for call in (c for c in chunk.contents if c.type == "function_call"):
+                    if call.call_id not in tool_calls_seen:
+                        tool_calls_seen.add(call.call_id)
+                        accumulated += f"\n_🔧 Using tool: `{call.name}`_\n\n"
+                        placeholder.markdown(accumulated + "▌")
+                if chunk.text:
+                    accumulated += chunk.text
+                    placeholder.markdown(accumulated + "▌")
+        placeholder.markdown(accumulated)
+        return accumulated
 
     async with (
         DefaultAzureCredential() as credential,
